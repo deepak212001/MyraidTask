@@ -90,7 +90,6 @@ const logoutUser = asyncHandler(async (req, res, next) => {
   res.clearCookie("token", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   });
   res
     .status(200)
