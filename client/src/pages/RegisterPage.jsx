@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { register } from "../lib/auth";
+import { fetchPublicKey } from "../crypto/publicKey.js";
+import { hybridDecryptResponse, hybridEncrypt } from "../crypto/aes.js";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -9,8 +11,19 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [serverPublicKey, setServerPublicKey] = useState("");
+  const [decryptedResponse, setDecryptedResponse] = useState(null);
+
   const { user, loading: authLoading, setUser } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    async function loadKey() {
+      const key = await fetchPublicKey();
+      setServerPublicKey(key);
+    }
+    loadKey();
+  }, []);
 
   if (authLoading) {
     return (
@@ -29,9 +42,57 @@ export default function RegisterPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
+    const formData = {
+      name: name,
+      email: email,
+      password: password,
+    };
+    const encryptedPayload = await hybridEncrypt(formData, serverPublicKey);
+    console.log("encryptedRequest", encryptedPayload);
     try {
-      const res = await register(name, email, password);
-      setUser(res.data.user);
+      const res = await register({
+        encryptedData: encryptedPayload.encryptedData,
+        encryptedAESKey: encryptedPayload.encryptedAESKey,
+        iv: encryptedPayload.iv,
+      });
+      console.log("res", res);
+      console.log("res", res);
+      let payload = res;
+      // If backend returns encrypted response, decrypt it using the same AES key we generated for the request.
+      if (
+        payload?.encrypted === true &&
+        payload?.encryptedData &&
+        payload?.iv
+      ) {
+        try {
+          if (
+            payload?.encryptedAESKey &&
+            payload.encryptedAESKey !== encryptedPayload.encryptedAESKey
+          ) {
+            throw new Error(
+              "Encrypted response does not match this request (encryptedAESKey mismatch)",
+            );
+          }
+          if (payload?.iv && payload.iv !== encryptedPayload.iv) {
+            throw new Error(
+              "Encrypted response does not match this request (iv mismatch)",
+            );
+          }
+          payload = await hybridDecryptResponse(
+            payload,
+            encryptedPayload.aesKey,
+          );
+        } catch (err) {
+          console.error("Failed to decrypt login response:", err);
+          payload = {
+            decryptError: err?.message || String(err),
+            rawEncryptedResponse: response.data,
+          };
+        }
+      }
+      console.log("payload", payload);
+      setDecryptedResponse(payload);
+      setUser(payload.user);
       navigate("/dashboard");
     } catch (err) {
       setError(err.message || "Registration failed");
@@ -44,8 +105,12 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="bg-[var(--card)] rounded-2xl p-8 shadow-xl border border-zinc-800">
-          <h1 className="text-2xl font-bold text-center mb-2">Create account</h1>
-          <p className="text-zinc-400 text-center mb-8">Get started with TaskFlow</p>
+          <h1 className="text-2xl font-bold text-center mb-2">
+            Create account
+          </h1>
+          <p className="text-zinc-400 text-center mb-8">
+            Get started with TaskFlow
+          </p>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (

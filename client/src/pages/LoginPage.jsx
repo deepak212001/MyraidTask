@@ -1,15 +1,27 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { login } from "../lib/auth";
+import { fetchPublicKey } from "../crypto/publicKey.js";
+import { hybridDecryptResponse, hybridEncrypt } from "../crypto/aes.js";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [serverPublicKey, setServerPublicKey] = useState("");
+  const [decryptedResponse, setDecryptedResponse] = useState(null);
   const { user, loading: authLoading, setUser } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    async function loadKey() {
+      const key = await fetchPublicKey();
+      setServerPublicKey(key);
+    }
+    loadKey();
+  }, []);
 
   if (authLoading) {
     return (
@@ -28,9 +40,58 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
+    const formData = {
+      email: email,
+      password: password,
+    };
+    const encryptedPayload = await hybridEncrypt(formData, serverPublicKey);
+    console.log("encryptedRequest", encryptedPayload);
+
     try {
-      const res = await login(email, password);
-      setUser(res.data.user);
+      const res = await login({
+        encryptedData: encryptedPayload.encryptedData,
+        encryptedAESKey: encryptedPayload.encryptedAESKey,
+        iv: encryptedPayload.iv,
+      });
+      console.log("res", res);
+      let payload = res;
+      // If backend returns encrypted response, decrypt it using the same AES key we generated for the request.
+      if (
+        payload?.encrypted === true &&
+        payload?.encryptedData &&
+        payload?.iv
+      ) {
+        try {
+          if (
+            payload?.encryptedAESKey &&
+            payload.encryptedAESKey !== encryptedPayload.encryptedAESKey
+          ) {
+            throw new Error(
+              "Encrypted response does not match this request (encryptedAESKey mismatch)",
+            );
+          }
+          if (payload?.iv && payload.iv !== encryptedPayload.iv) {
+            throw new Error(
+              "Encrypted response does not match this request (iv mismatch)",
+            );
+          }
+          payload = await hybridDecryptResponse(
+            payload,
+            encryptedPayload.aesKey,
+          );
+        } catch (err) {
+          console.error("Failed to decrypt login response:", err);
+          payload = {
+            decryptError: err?.message || String(err),
+            rawEncryptedResponse: response.data,
+          };
+        }
+      }
+      console.log("payload", payload);
+      setDecryptedResponse(payload);
+      setUser(payload.user);
+      console.log("response: ", payload);
+      // setUser(res.data.user);
       navigate("/dashboard");
     } catch (err) {
       setError(err.message || "Login failed");
@@ -44,7 +105,9 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="bg-[var(--card)] rounded-2xl p-8 shadow-xl border border-zinc-800">
           <h1 className="text-2xl font-bold text-center mb-2">Welcome back</h1>
-          <p className="text-zinc-400 text-center mb-8">Sign in to your account</p>
+          <p className="text-zinc-400 text-center mb-8">
+            Sign in to your account
+          </p>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (

@@ -2,29 +2,25 @@ import Task from "../models/task.model.js";
 import {asyncHandler} from "../utils/asyncHandler.js";
 import {ApiError} from "../utils/ApiError.js";
 import {ApiResponse} from "../utils/ApiResponse.js";
-import {encrypt, decrypt} from "../utils/encryption.js";
+
 import {
   createTaskSchema,
   updateTaskSchema,
   getTasksQuerySchema,
 } from "../validators/task.validator.js";
-const ENCRYPT_DESCRIPTION = process.env.ENCRYPT_DESCRIPTION === "true";
 
 const createTask = asyncHandler(async (req, res, next) => {
+  console.log("req.body", req.body);
   const validatedData = createTaskSchema.parse(req.body);
   const {title, description, status} = validatedData;
   const task = await Task.create({
     title,
-    description: ENCRYPT_DESCRIPTION
-      ? encrypt(description || "")
-      : description || "",
+    description,
     status,
     owner: req.user._id,
   });
   const taskObj = task.toObject();
-  if (ENCRYPT_DESCRIPTION && taskObj.description) {
-    taskObj.description = decrypt(taskObj.description);
-  }
+
   res
     .status(201)
     .json(new ApiResponse(201, {task: taskObj}, "Task created successfully"));
@@ -49,12 +45,6 @@ const getTasks = asyncHandler(async (req, res, next) => {
     Task.countDocuments(query),
   ]);
 
-  if (ENCRYPT_DESCRIPTION) {
-    tasks.forEach((t) => {
-      if (t.description) t.description = decrypt(t.description);
-    });
-  }
-
   res.status(200).json(
     new ApiResponse(
       200,
@@ -74,9 +64,6 @@ const getTasks = asyncHandler(async (req, res, next) => {
 
 const getTaskById = asyncHandler(async (req, res, next) => {
   const task = req.task.toObject();
-  if (ENCRYPT_DESCRIPTION && task.description) {
-    task.description = decrypt(task.description);
-  }
   res
     .status(200)
     .json(new ApiResponse(200, {task}, "Task fetched successfully"));
@@ -89,15 +76,11 @@ const updateTask = asyncHandler(async (req, res, next) => {
 
   if (title !== undefined) task.title = title;
   if (status !== undefined) task.status = status;
-  if (description !== undefined) {
-    task.description = ENCRYPT_DESCRIPTION ? encrypt(description) : description;
-  }
+  if (description !== undefined) task.description = description;
 
   await task.save();
   const taskObj = task.toObject();
-  if (ENCRYPT_DESCRIPTION && taskObj.description) {
-    taskObj.description = decrypt(taskObj.description);
-  }
+
   res
     .status(200)
     .json(new ApiResponse(200, {task: taskObj}, "Task updated successfully"));

@@ -6,6 +6,7 @@ import errorHandler from "./middlewares/errorHandler.middleware.js";
 import userRouter from "./routers/user.route.js";
 import taskRouter from "./routers/task.route.js";
 
+import cryptoRouter from './routes/publicKey.js'
 const app = express();
 
 const allowedOrigins = [
@@ -41,6 +42,8 @@ app.use("/api/", limiter);
 
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/tasks", taskRouter);
+
+app.use("/api/v1/crypto", cryptoRouter)
 
 app.use(errorHandler);
 
