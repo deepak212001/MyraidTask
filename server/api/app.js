@@ -12,7 +12,7 @@ const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:5173",
   "http://127.0.0.1:3000",
-  process.env.FRONTEND_URL,
+  "https://myraid-task-rqz5.vercel.app",
 ].filter(Boolean);
 
 app.use(
@@ -22,8 +22,8 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "16kb" }));
-app.use(express.urlencoded({ extended: true, limit: "16kb" }));
+app.use(express.json({limit: "16kb"}));
+app.use(express.urlencoded({extended: true, limit: "16kb"}));
 app.use(cookieParser());
 
 // Note: express-mongo-sanitize removed - incompatible with Express 5 (req.query is read-only).
@@ -32,7 +32,10 @@ app.use(cookieParser());
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
-  message: { success: false, message: "Too many requests, please try again later" },
+  message: {
+    success: false,
+    message: "Too many requests, please try again later",
+  },
 });
 app.use("/api/", limiter);
 
@@ -41,4 +44,4 @@ app.use("/api/v1/tasks", taskRouter);
 
 app.use(errorHandler);
 
-export { app };
+export {app};

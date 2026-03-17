@@ -9,7 +9,7 @@ import connectDB from "./utils/connectDB.js";
 import { app } from "./app.js";
 
 app.get("/", (req, res) => {
-  res.json({ message: "Task Management API - Server is running!" });
+  res.json("Task Management API - Server is running!" );
 });
 
 connectDB()
