@@ -1,0 +1,19 @@
+# Render Blueprint - Deploy backend
+# Set root directory to "server" in Render dashboard, or deploy server/ as separate service
+
+services:
+  - type: web
+    name: taskflow-api
+    env: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        sync: false
