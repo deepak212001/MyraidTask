@@ -87,7 +87,12 @@ const loginUser = asyncHandler(async (req, res, next) => {
 });
 
 const logoutUser = asyncHandler(async (req, res, next) => {
-  res.clearCookie("token");
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 1000 * 60 * 60 * 24 * 30,
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  });
   res
     .status(200)
     .json(new ApiResponse(200, {}, "User logged out successfully"));
